@@ -180,3 +180,11 @@ If you want, I can also:
 * Add installation notes for Linux/Windows
 
 Just tell me!
+
+---
+## For Running locally
+
+cd /Users/frhnkhn/Codes/llm-from-scratch
+source .venv/bin/activate
+
+python cool_ollama_site.py
