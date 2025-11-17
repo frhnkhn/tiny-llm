@@ -51,8 +51,8 @@ y_train, y_val = targets[:split], targets[split:]
 
 # 3. TRAINING CONFIG -------------------------------------------
 batch_size = 64
-max_iters = 3000
-eval_interval = 300
+max_iters = 2000
+eval_interval = 200
 learning_rate = 1e-3
 n_hidden = 128
 n_embd = 32  # size of embedding per character
@@ -63,17 +63,13 @@ def get_batch(split_name: str):
     else:
         X, Y = x_val, y_val
 
-    if X.size(0) < batch_size:
-        # if dataset is tiny, just repeat samples
-        idx = torch.randint(0, X.size(0), (batch_size,))
-    else:
-        idx = torch.randint(0, X.size(0), (batch_size,))
+    idx = torch.randint(0, X.size(0), (batch_size,))
     xb = X[idx].to(device)
     yb = Y[idx].to(device)
     return xb, yb
 
 @torch.no_grad()
-def estimate_loss(model, num_batches: int = 50):
+def estimate_loss(model, num_batches: int = 20):
     model.eval()
     losses = {"train": [], "val": []}
     for split_name in ["train", "val"]:
@@ -82,7 +78,7 @@ def estimate_loss(model, num_batches: int = 50):
             _, loss = model(xb, yb)
             losses[split_name].append(loss.item())
     model.train()
-    return {k: sum(v)/len(v) for k, v in losses.items()}
+    return {k: sum(v) / len(v) for k, v in losses.items()}
 
 # 4. MODEL: small MLP with context -----------------------------
 
@@ -106,11 +102,9 @@ class TinyContextModel(nn.Module):
     def forward(self, idx, targets=None):
         # idx: (B, T=block_size)
         B, T = idx.shape
-        # embed -> (B, T, n_embd)
-        x = self.embed(idx)
-        # flatten context -> (B, T * n_embd)
-        x = x.view(B, T * n_embd)
-        logits = self.net(x)  # (B, vocab_size)
+        x = self.embed(idx)              # (B, T, n_embd)
+        x = x.view(B, T * n_embd)        # (B, T*n_embd)
+        logits = self.net(x)             # (B, vocab_size)
 
         loss = None
         if targets is not None:
@@ -133,7 +127,7 @@ class TinyContextModel(nn.Module):
             # take last block_size chars as input
             context = generated[-block_size:]
             if context.numel() < block_size:
-                # pad left with first char if not enough history
+                # pad on the left with first element
                 pad = context[0].repeat(block_size - context.numel())
                 context = torch.cat([pad, context], dim=0)
 
@@ -158,7 +152,7 @@ for step in range(max_iters + 1):
     optimizer.step()
 
     if step % eval_interval == 0 or step == max_iters:
-        losses = estimate_loss(model, num_batches=30)
+        losses = estimate_loss(model, num_batches=10)
         print(
             f"step {step}/{max_iters}, "
             f"train loss {losses['train']:.4f}, val loss {losses['val']:.4f}"
@@ -172,4 +166,53 @@ sample_ids = model.generate(start_ids, max_new_tokens=200)
 print("---- sample text (v2) ----")
 print(decode(sample_ids.tolist()))
 print("--------------------------")
+
+# SAVE CHECKPOINT ----------------------------------------------
+ckpt_path = "tiny_llm_v2_ckpt.pt"
+print(f"Saving model to {ckpt_path} ...")
+
+torch.save(
+    {
+        "model_state_dict": model.state_dict(),
+        "stoi": stoi,
+        "itos": itos,
+        "config": {
+            "vocab_size": vocab_size,
+            "block_size": block_size,
+            "n_embd": n_embd,
+            "n_hidden": n_hidden,
+        },
+    },
+    ckpt_path,
+)
+
+print("Checkpoint saved.\n")
+
+# 6. SIMPLE CHAT LOOP ------------------------------------------
+
+def chat():
+    print("\nTiny LLM v2 chat. Type 'quit' to stop.\n")
+    while True:
+        user = input("You: ")
+        if user.strip().lower() in ("quit", "exit", "q"):
+            print("Bot: bye bye 👋")
+            break
+
+        prompt = f"User: {user}\nBot:"
+        context_ids = torch.tensor(encode(prompt), dtype=torch.long)
+
+        if context_ids.numel() == 0:
+            print("Bot: (I don't know these characters yet 😅)")
+            continue
+
+        out_ids = model.generate(context_ids, max_new_tokens=120)
+        full_text = decode(out_ids.tolist())
+        reply = full_text[len(prompt):].strip().replace("\n", " ")
+
+        if not reply:
+            reply = "(tiny brain v2 is confused 😵)"
+        print("Bot:", reply)
+
+if __name__ == "__main__":
+    chat()
 
