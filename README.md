@@ -184,7 +184,10 @@ Just tell me!
 ---
 ## For Running locally
 
+```bash
 cd /Users/frhnkhn/Codes/llm-from-scratch
+
 source .venv/bin/activate
 
 python cool_ollama_site.py
+```
