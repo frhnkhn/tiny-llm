@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Farhan's Tiny LLM v2</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="page">
+    <div class="card">
+      <div class="card-header">
+        <div class="title">Farhan's Tiny LLM v2 🤖</div>
+        <div class="subtitle">Tiny brain, big vibes. Running locally on my Mac.</div>
+      </div>
+
+      <div id="chat-box" class="chat-box">
+        <div class="message bot">
+          <div class="bubble">
+            Hey, I'm your tiny LLM. Ask me about IRLXP, AI, or yourself 😄
+          </div>
+        </div>
+      </div>
+
+      <form id="chat-form" class="input-row">
+        <input
+          id="user-input"
+          type="text"
+          placeholder="Type your message..."
+          autocomplete="off"
+        />
+        <button type="submit">Send</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById("chat-form");
+    const input = document.getElementById("user-input");
+    const chatBox = document.getElementById("chat-box");
+
+    function appendMessage(text, sender) {
+      const msg = document.createElement("div");
+      msg.className = "message " + sender;
+
+      const bubble = document.createElement("div");
+      bubble.className = "bubble";
+      bubble.textContent = text;
+
+      msg.appendChild(bubble);
+      chatBox.appendChild(msg);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+
+      appendMessage(text, "user");
+      input.value = "";
+
+      try {
+        const res = await fetch("/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: text }),
+        });
+
+        const data = await res.json();
+        appendMessage(data.reply, "bot");
+      } catch (err) {
+        appendMessage("(error talking to tiny brain 😵)", "bot");
+      }
+    });
+  </script>
+</body>
+</html>
